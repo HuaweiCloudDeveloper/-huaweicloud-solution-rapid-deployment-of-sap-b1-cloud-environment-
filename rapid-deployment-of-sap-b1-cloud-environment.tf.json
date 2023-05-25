@@ -1,0 +1,907 @@
+{
+    "terraform": {
+        "required_providers": [
+            {
+                "huaweicloud": {
+                    "source": "huawei.com/provider/huaweicloud",
+                    "version": ">=1.44.0"
+                }
+            }
+        ]
+    },
+    "provider": {
+        "huaweicloud": {
+            "cloud": "myhuaweicloud.com",
+            "endpoints": {
+                "iam": "iam.ap-southeast-3.myhuaweicloud.com",
+                "dns": "dns.ap-southeast-3.myhuaweicloud.com",
+                "bss": "bss.myhuaweicloud.com"
+            },
+            "enterprise_project_id": "${var.enterprise_project_id}",
+            "insecure": true,
+            "region": "ap-southeast-3",
+            "auth_url": "https://iam.ap-southeast-3.myhuaweicloud.com/v3"
+        }
+    },
+    "variable": {
+        "availability_zone": {
+            "default": "ap-southeast-3c",
+            "description": "AZ where the solution is to be deployed. Only AZs in AP-Singapore are supported. Obtain the AZ information in the Quick Deployment of Cloud Environment for SAP Business One. ap-southeast-3c is used by default.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${contains([\"ap-southeast-3a\",\"ap-southeast-3b\",\"ap-southeast-3c\"], var.availability_zone)}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "enterprise_project_id": {
+            "default": "0",
+            "description": "Enterprise project ID. Obtain the ID from the Enterprise Project Management console by referring to the Quick Deployment of Cloud Environment for SAP Business One. 0 indicates the default enterprise project. The default value is 0.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^(0|[a-z0-9]{8}(-[a-z0-9]{4}){3}-[a-z0-9]{12})$\",var.enterprise_project_id))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "vpc_name": {
+            "default": "sap-b1-cloud-environment-demo",
+            "description": "Virtual Private Cloud (VPC) name. This template uses a newly created VPC and the VPC name must be unique. Value range: 1 to 47 characters, including letters, digits, underscores (_), hyphens (-), and periods (.). sap-b1-cloud-environment-demo is used by default.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^[\\\\w\\\\.-]{1,64}$\",var.vpc_name))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "vpc_cidr": {
+            "default": "172.16.0.0/16",
+            "description": "VPC CIDR block. Value range: 10.0.0.0/8–24, 172.16.0.0/12–24, 192.168.0.0/16–24. Default value: 172.16.0.0/16.",
+            "type": "string",
+            "nullable": false
+        },
+        "ecs_server_name": {
+            "default": "sap-b1-cloud-environment-demo-server",
+            "description": "Name of the ECS where SAP Business One is to be deployed, which must be unique. Value range: 1 to 51 characters, including letters, digits, underscores (_), hyphens (-), and periods (.). sap-b1-cloud-environment-demo-server is used by default.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^[\\\\w\\\\.-]{1,51}$\",var.ecs_server_name))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "ecs_server_flavor": {
+            "default": "c6.2xlarge.4",
+            "description": "SAP Business One ECS specifications. For details about the supported specifications, see the marketplace image SUSE Linux for SAP 15 SP3 in the Quick Deployment of Cloud Environment for SAP Business One (specifications with 8 vCPUs or more are recommended). c6.2xlarge.4 (c6|8 vCPUs|32 GiB) is used by default.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^([a-z][a-z0-9]{0,3}\\\\.)(small\\\\.|medium\\\\.|(x||[1-9][0-9]{0,1}x)large\\\\.)[1-9][0-9]{0,1}$\",var.ecs_server_flavor))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "server_image_id": {
+            "default": "eafbd213-067a-409e-9c0f-07a3d6ac1488",
+            "description": "Image ID of the ECS where SAP Business One is to be deployed, which can be a shared image ID, private image ID, or public image ID. The default image is SUSE Linux for SAP 15 SP3, which is a marketplace image.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^[a-z0-9]{8}(-[a-z0-9]{4}){3}-[a-z0-9]{12}$\",var.server_image_id))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "ecs_server_password": {
+            "default": "",
+            "description": "Initial password for logging in to the ECS where SAP Business One is to be deployed. After an ECS is created, log in to the ECS console and change the password by referring to the Quick Deployment of Cloud Environment for SAP Business One. Value range: 8 to 26 characters, containing at least three of the following character types: uppercase letters, lowercase letters, digits, and special characters (!@$%^-_=+[{}]:,./?), and cannot contain the username or the username spelled backwards. Administrator: root.",
+            "type": "string",
+            "nullable": false,
+            "sensitive": true
+        },
+        "subnet_server_cidr": {
+            "default": "172.16.1.0/24",
+            "description": "Subnet CIDR block of the ECS where SAP Business One is to be deployed. The value can be: 10.0.0.0/8–24, 172.16.0.0/12–24, 192.168.0.0/16–24. Default value: 172.16.1.0/24.",
+            "type": "string",
+            "nullable": false
+        },
+        "ecs_server_businessIP": {
+            "default": "172.16.1.10",
+            "description": "Service IP address of the ECS where SAP Business One is to be deployed. Value range: an IP address within subnet_server_cidr. Default value: 172.16.1.10.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$\",var.ecs_server_businessIP))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "server_system_disk_type": {
+            "default": "SAS",
+            "description": "Type of the system disk used by the ECS where SAP Business One is to be deployed. Value options: ESSD (Extreme SSD), SSD (Ultra-high I/O), GPSSD (General Purpose SSD) or SAS (High I/O). Default value: SAS.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${contains([\"ESSD\",\"SSD\",\"GPSSD\",\"SAS\"], var.server_system_disk_type)}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "server_system_disk_size": {
+            "default": "40",
+            "description": "Size of the system disk used by the ECS where SAP Business One is to be deployed. The unit is GB. The value ranges from 40 to 1024. The system disk size cannot be reduced. Default value: 40.",
+            "type": "number",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^([4-9]\\\\d{1,2}|10[0-2][0-4])$\",var.server_system_disk_size))>0}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "evs_hana_sap_type": {
+            "default": "SAS",
+            "description": "EVS disk type. Value options: SAS (high I/O), SSD (ultra-high I/O), GPSSD (general-purpose SSD), and ESSD (Extreme SSD). Mount path: /usr/sap. Default value: SAS.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${contains([\"ESSD\",\"SSD\",\"GPSSD\",\"SAS\"], var.evs_hana_sap_type)}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "evs_hana_sap_size": {
+            "default": "50",
+            "description": "EVS disk size in GB. The value ranges from 10 to 32768. Mount path: /usr/sap. Default value: 50.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^([1-9]\\\\d{1,3}|[1-2]\\\\d{4}|3[0-1]\\\\d{3}|32[0-6]\\\\d{2}|327[0-5]\\\\d|3276[0-8])$\",var.evs_hana_sap_size))>0}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "evs_hana_swap_type": {
+            "default": "SAS",
+            "description": "Type of EVS disk used as the swap volume. Value options: SAS (high I/O), SSD (ultra-high I/O), GPSSD (general-purpose SSD), and ESSD (Extreme SSD). Default value: SAS.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${contains([\"ESSD\",\"SSD\",\"GPSSD\",\"SAS\"], var.evs_hana_swap_type)}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "evs_hana_swap_size": {
+            "default": "10",
+            "description": "Size of EVS disk used as the swap volume. The unit is GB, and the value ranges from 10 to 32768. Default value: 10.",
+            "type": "number",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^([1-9]\\\\d{1,3}|[1-2]\\\\d{4}|3[0-1]\\\\d{3}|32[0-6]\\\\d{2}|327[0-5]\\\\d|3276[0-8])$\",var.evs_hana_swap_size))>0}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "evs_hana_log_type": {
+            "default": "SSD",
+            "description": "EVS disk type. Value options: SAS (high I/O), SSD (ultra-high I/O), GPSSD (general-purpose SSD), and ESSD (Extreme SSD). Mount path: /hana/log. Default value: SSD.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${contains([\"ESSD\",\"SSD\",\"GPSSD\",\"SAS\"], var.evs_hana_log_type)}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "evs_hana_log_size": {
+            "default": "100",
+            "description": "EVS disk size in GB. The value ranges from 10 to 32768. Mount path: /hana/log. Default value: 100.",
+            "type": "number",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^([1-9]\\\\d{1,3}|[1-2]\\\\d{4}|3[0-1]\\\\d{3}|32[0-6]\\\\d{2}|327[0-5]\\\\d|3276[0-8])$\",var.evs_hana_log_size))>0}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "evs_hana_shared_type": {
+            "default": "SAS",
+            "description": "EVS disk type. Value options: SAS (high I/O), SSD (ultra-high I/O), GPSSD (general-purpose SSD), and ESSD (Extreme SSD). Mount path: /hana/shared. Default value: SAS.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${contains([\"ESSD\",\"SSD\",\"GPSSD\",\"SAS\"], var.evs_hana_shared_type)}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "evs_hana_shared_size": {
+            "default": "100",
+            "description": "EVS disk size in GB. The value ranges from 20 to 32768. Mount path: /hana/shared. Default value: 100.",
+            "type": "number",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^(20|[3-9]\\\\d|[1-9]\\\\d{2,3}|[1-2]\\\\d{4}|3[0-1][0-9]{3}|32[0-6][0-9]{2}|327[0-5][0-9]|3276[0-8])$\",var.evs_hana_shared_size))>0}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "evs_hana_data_type": {
+            "default": "SSD",
+            "description": "EVS disk type. Value options: SAS (high I/O), SSD (ultra-high I/O), GPSSD (general-purpose SSD), and ESSD (Extreme SSD). Mount path: /hana/data. Default value: SSD.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${contains([\"ESSD\",\"SSD\",\"GPSSD\",\"SAS\"], var.evs_hana_data_type)}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "evs_hana_data_size": {
+            "default": "200",
+            "description": "EVS disk size in GB. The value ranges from 20 to 32768. Mount path: /hana/data. Default value: 200",
+            "type": "number",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^(20|[3-9]\\\\d|[1-9]\\\\d{2,3}|[1-2]\\\\d{4}|3[0-1][0-9]{3}|32[0-6][0-9]{2}|327[0-5][0-9]|3276[0-8])$\",var.evs_hana_data_size))>0}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "ecs_client_name": {
+            "default": "sap-b1-cloud-environment-demo-client",
+            "description": "Name of the ECS where the SAP Business One Client is deployed, which must be unique. Value range: 1 to 51 characters, including letters, digits, underscores (_), hyphens (-), and periods (.). Default value: sap-b1-cloud-environment-demo-client.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^[\\\\w\\\\.-]{1,64}$\",var.ecs_client_name))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "ecs_client_flavor": {
+            "default": "c6.xlarge.2",
+            "description": "Specifications of the ECS where the SAP Business One Client is deployed. For details about the supported specifications, see the marketplace image SUSE Linux for SAP 15 SP3 in the Quick Deployment of Cloud Environment for SAP Business One (specifications with one to four vCPUs are supported by the default image). Default value: c6.xlarge.2 (c6|4 vCPUs|8 GiB).",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^([a-z][a-z0-9]{0,3}\\\\.)(small\\\\.|medium\\\\.|(x||[1-9][0-9]{0,1}x)large\\\\.)[1-9][0-9]{0,1}$\",var.ecs_client_flavor))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "client_image_id": {
+            "default": "a8b7692c-db58-40f4-8ba8-d90d6d1057b6",
+            "description": "Image ID of the ECS where the SAP Business One Client is deployed, which can be a shared image ID, private image ID, or public image ID. The marketplace image SUSE Linux for SAP 15 SP3 is used by default.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^[a-z0-9]{8}(-[a-z0-9]{4}){3}-[a-z0-9]{12}$\",var.client_image_id))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "ecs_client_password": {
+            "default": "",
+            "description": "Initial password for logging in to the ECS where SAP Business One Client is to be deployed. After an ECS is created, log in to the ECS console and change the password by referring to the Quick Deployment of Cloud Environment for SAP Business One. Value range: 8 to 26 characters, containing at least three of the following character types: uppercase letters, lowercase letters, digits, and special characters (!@$%^-_=+[{}]:,./?), and cannot contain the username or the username spelled backwards. Administrator account: Administrator.",
+            "type": "string",
+            "nullable": false,
+            "sensitive": true
+        },
+        "subnet_client_cidr": {
+            "default": "172.16.2.0/24",
+            "description": "Subnet CIDR block of the ECS where SAP Business One Client is to be deployed. The value can be: 10.0.0.0/8–24, 172.16.0.0/12–24, 192.168.0.0/16–24. Default value: 172.16.2.0/24.",
+            "type": "string",
+            "nullable": false
+        },
+        "ecs_client_businessIP": {
+            "default": "172.16.2.20",
+            "description": "Service IP address of the ECS where SAP Business One Client is to be deployed. Value range: an IP address within subnet_client_cidr. Default value: 172.16.2.20.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?))$\",var.ecs_client_businessIP))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "client_system_disk_type": {
+            "default": "SAS",
+            "description": "Type of the system disk used by the ECS where SAP Business One Client is to be deployed. Value options: ESSD (Extreme SSD), SSD (Ultra-high I/O), GPSSD (General Purpose SSD) or SAS (High I/O). Default value: SAS.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${contains([\"ESSD\",\"SSD\",\"GPSSD\",\"SAS\"], var.client_system_disk_type)}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "client_system_disk_size": {
+            "default": "40",
+            "description": "Size of the system disk used by the ECS where SAP Business One Client is to be deployed. The unit is GB. The value ranges from 40 to 1024. The system disk size cannot be reduced. Default value: 40.",
+            "type": "number",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^([4-9]\\\\d{1,2}|10[0-1][0-4])$\",var.client_system_disk_size))>0}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "client_data_disk_type": {
+            "default": "SAS",
+            "description": "Type of the data disk used by the ECS where SAP Business One Client is to be deployed. Value options: ESSD (Extreme SSD), SSD (Ultra-high I/O), GPSSD (General Purpose SSD) or SAS (High I/O). Default value: SAS.",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${contains([\"ESSD\",\"SSD\",\"GPSSD\",\"SAS\"], var.client_data_disk_type)}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "client_data_disk_size": {
+            "default": "40",
+            "description": "Size of the data disk used by the ECS where SAP Business One Client is to be deployed. The unit is GB. The value ranges from 10 to 32768. Default value: 40.",
+            "type": "number",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^([1-9]\\\\d{1,3}|[1-2]\\\\d{4}|3[0-1]\\\\d{3}|32[0-6]\\\\d{2}|327[0-5]\\\\d|3276[0-8])$\",var.client_data_disk_size))>0}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "is_hss": {
+            "default": false,
+            "description": "Whether to purchase a quota of enterprise-edition Host Security Service (HSS). The value can be true or false. Default value: false.",
+            "type": "bool",
+            "nullable": false,
+            "validation": {
+                "condition": "${contains([true,false], var.is_hss)}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "sfs_turbo_name": {
+            "default": "",
+            "description": "SFS Turbo file system name, which must be unique. If SFS Turbo is not used for HANA backup, leave this parameter blank. Value range: 4 to 64 characters, including lowercase letters, digits, hyphens (-), and periods (.).",
+            "type": "string",
+            "nullable": true,
+            "validation": {
+                "condition": "${length(regexall(\"^([a-z0-9\\\\.-]{4,64})$|^$\",var.sfs_turbo_name))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "subnet_sfs_turbo_cidr": {
+            "default": "172.16.4.0/24",
+            "description": "SFS Turbo subnet CIDR block. If SFS Turbo is not used for HANA backup, leave this parameter blank. Value ranges: 10.0.0.0/8-24, 172.16.0.0/12-24, 192.168.0.0/16-24. Default value: 172.16.4.0/24.",
+            "type": "string",
+            "nullable": true
+        },
+        "obs_bucket_name": {
+            "default": "",
+            "description": "Name of Object Storage Service (OBS) parallel file system, which must be unique. If OBS is not used for HANA backup, leave this parameter blank. Value range: 3 to 63 characters, including lowercase letters, digits, hyphens (-), and periods (.).",
+            "type": "string",
+            "nullable": true,
+            "validation": {
+                "condition": "${length(regexall(\"^([a-z\\\\d\\\\.-]{3,63})$|^$\",var.obs_bucket_name))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "ak": {
+            "default": "",
+            "description": "Access key ID. The access key ID is provided for the obsfs tool to mount the parallel file system. If the parallel file system does not need to be mounted, leave this parameter blank. For details about how to obtain the access key ID, see the Quick Deployment of Cloud Environment for SAP Business One.",
+            "type": "string",
+            "nullable": true,
+            "sensitive": true
+        },
+        "sk": {
+            "default": "",
+            "description": "Secret access key used together with the access key ID. The secret access key is provided for the obsfs tool to mount the parallel file system. If the parallel file system does not need to be mounted, leave this parameter blank.",
+            "type": "string",
+            "nullable": true,
+            "sensitive": true
+        },
+        "eip_bandwidth_size": {
+            "default": "5",
+            "description": "Bandwidth (Mbit/s) of the elastic IP address bound to the NAT Gateway. The value ranges from 1 to 2000. Default value: 5",
+            "type": "number",
+            "nullable": false,
+            "validation": {
+                "condition": "${length(regexall(\"^(1[0-9]{3}|[1-9][0-9]{0,2}|2000)$\",var.eip_bandwidth_size))>0}",
+                "error_message": "Invalid input. Please re-enter."
+            }
+        },
+        "charging_mode": {
+            "default": "prePaid",
+            "description": "Billing mode. Value options: prePaid (yearly/monthly) or postPaid (pay-per-use). Default value: prePaid",
+            "type": "string",
+            "nullable": false,
+            "validation": {
+                "condition": "${contains([\"postPaid\",\"prePaid\"], var.charging_mode)}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "charging_unit": {
+            "default": "month",
+            "description": "Subscription period unit. This parameter is valid only when charging_mode is set to prePaid. The value can be month or year. Default value: month.",
+            "type": "string",
+            "nullable": true,
+            "validation": {
+                "condition": "${contains([\"month\",\"year\"], var.charging_unit)}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        },
+        "charging_period": {
+            "default": 1,
+            "description": "Subscription period. This parameter is valid only when charging_mode is set to prePaid. When charging_unit is set to month, the value ranges from 1 to 9. When charging_unit is set to year, the value ranges from 1 to 3. The default subscription period is one month.",
+            "type": "number",
+            "nullable": true,
+            "validation": {
+                "condition": "${length(regexall(\"^[1-9]$|^$\",var.charging_period))>0}",
+                "error_message": "Invalid input, please re-enter."
+            }
+        }
+    },
+    "locals": {
+        "sfs_turbo_ip": "${var.sfs_turbo_name == \"\" ? \"\" : huaweicloud_sfs_turbo.sfs_turbo_b1_backup[0].export_location}"
+    },
+    "resource": {
+        "huaweicloud_vpc": {
+            "vpc": {
+                "cidr": "${var.vpc_cidr}",
+                "name": "${var.vpc_name}"
+            }
+        },
+        "huaweicloud_vpc_subnet": {
+            "subnet_b1_server": {
+                "cidr": "${var.subnet_server_cidr}",
+                "gateway_ip": "${cidrhost(var.subnet_server_cidr,1)}",
+                "name": "subnet-b1-server",
+                "vpc_id": "${huaweicloud_vpc.vpc.id}"
+            },
+            "subnet_b1_client": {
+                "cidr": "${var.subnet_client_cidr}",
+                "gateway_ip": "${cidrhost(var.subnet_client_cidr,1)}",
+                "name": "subnet-b1-client",
+                "vpc_id": "${huaweicloud_vpc.vpc.id}"
+            },
+            "subnet_sfs_turbo": {
+                "count": "${var.sfs_turbo_name == \"\" ? 0 : 1}",
+                "cidr": "${var.subnet_sfs_turbo_cidr}",
+                "gateway_ip": "${cidrhost(var.subnet_sfs_turbo_cidr,1)}",
+                "name": "subnet_sfs_turbo",
+                "vpc_id": "${huaweicloud_vpc.vpc.id}"
+            }
+        },
+        "huaweicloud_network_acl": {
+            "acl_b1_server": {
+                "name": "acl-b1-server",
+                "subnets": [
+                    "${huaweicloud_vpc_subnet.subnet_b1_server.id}"
+                ],
+                "inbound_rules": [
+                    "${huaweicloud_network_acl_rule.dnat22_acl_rule.id}",
+                    "${huaweicloud_network_acl_rule.dnat50000_acl_rule.id}",
+                    "${huaweicloud_network_acl_rule.vpc_acl_rule.id}",
+                    "${huaweicloud_network_acl_rule.cbr_acl_rule.id}"
+                ],
+                "outbound_rules": [
+                    "${huaweicloud_network_acl_rule.out_acl_rule.id}"
+                ]
+            },
+            "acl_b1_client": {
+                "name": "acl-b1-client",
+                "subnets": [
+                    "${huaweicloud_vpc_subnet.subnet_b1_client.id}"
+                ],
+                "inbound_rules": [
+                    "${huaweicloud_network_acl_rule.vpc_acl_rule.id}",
+                    "${huaweicloud_network_acl_rule.dnat3389_acl_rule.id}"
+                ],
+                "outbound_rules": [
+                    "${huaweicloud_network_acl_rule.out_acl_rule.id}"
+                ]
+            }
+        },
+        "huaweicloud_network_acl_rule": {
+            "dnat22_acl_rule": {
+                "description": "External access to the SFTP or SSH of the SAP Business One server through the destination NAT (DNAT).",
+                "source_ip_address": "0.0.0.0/0",
+                "destination_ip_address": "${var.subnet_server_cidr}",
+                "destination_port": "22",
+                "action": "allow",
+                "protocol": "tcp",
+                "enabled": "true"
+            },
+            "dnat50000_acl_rule": {
+                "description": "External access to the Service Layer of SAP Business One through the DNAT.",
+                "source_ip_address": "0.0.0.0/0",
+                "destination_ip_address": "${var.subnet_server_cidr}",
+                "destination_port": "50000",
+                "action": "allow",
+                "protocol": "tcp",
+                "enabled": "true"
+            },
+            "dnat3389_acl_rule": {
+                "description": "External access to the remote desktop of SAP Business One Client through the DNAT.",
+                "source_ip_address": "0.0.0.0/0",
+                "destination_ip_address": "${var.subnet_client_cidr}",
+                "destination_port": "3389",
+                "action": "allow",
+                "protocol": "tcp",
+                "enabled": "true"
+            },
+            "cbr_acl_rule": {
+                "description": "Bypass the access port of Cloud Backup and Recovery (CBR) for database backup.",
+                "source_ip_address": "100.125.0.0/16",
+                "destination_ip_address": "${var.subnet_server_cidr}",
+                "destination_port": "59526:59528",
+                "action": "allow",
+                "protocol": "tcp",
+                "enabled": "true"
+            },
+            "vpc_acl_rule": {
+                "description": "Communication within a VPC.",
+                "source_ip_address": "${var.vpc_cidr}",
+                "destination_ip_address": "${var.vpc_cidr}",
+                "action": "allow",
+                "protocol": "any",
+                "enabled": "true"
+            },
+            "out_acl_rule": {
+                "description": "Allow all outbound traffic.",
+                "source_ip_address": "${var.vpc_cidr}",
+                "destination_ip_address": "0.0.0.0/0",
+                "action": "allow",
+                "protocol": "any",
+                "enabled": "true"
+            }
+        },
+        "huaweicloud_networking_secgroup": {
+            "secgroup_b1_server": {
+                "name": "${var.ecs_server_name}-sg-b1-server"
+            },
+            "secgroup_b1_client": {
+                "name": "${var.ecs_client_name}-sg-b1-client"
+            }
+        },
+        "huaweicloud_vpc_address_group": {
+            "ipGroup-tcp22": {
+                "name": "${var.vpc_name}-ipGroup-tcp22",
+                "description": "IP address whitelist for accessing the SSH, SFTP, or remote desktop of the SAP Business One server.",
+                "addresses": [
+                    "${var.subnet_client_cidr}"
+                ]
+            },
+            "ipGroup-b1client": {
+                "name": "${var.vpc_name}-ipGroup-b1client",
+                "description": "CIDR block of SAP Business One Client",
+                "addresses": [
+                    "${var.subnet_client_cidr}"
+                ]
+            }
+        },
+        "huaweicloud_networking_secgroup_rule": {
+            "dnat_to_server22": {
+                "description": "External access to the SFTP or SSH of the SAP Business One server through the destination NAT (DNAT).",
+                "direction": "ingress",
+                "ethertype": "IPv4",
+                "protocol": "tcp",
+                "ports": "22",
+                "remote_address_group_id": "${huaweicloud_vpc_address_group.ipGroup-tcp22.id}",
+                "security_group_id": "${huaweicloud_networking_secgroup.secgroup_b1_server.id}"
+            },
+            "dnat_to_client3389": {
+                "description": "External access to the remote desktop of the SAP Business One Client through the DNAT.",
+                "direction": "ingress",
+                "ethertype": "IPv4",
+                "protocol": "tcp",
+                "ports": "3389",
+                "remote_address_group_id": "${huaweicloud_vpc_address_group.ipGroup-tcp22.id}",
+                "security_group_id": "${huaweicloud_networking_secgroup.secgroup_b1_client.id}"
+            },
+            "b1client_to_samba": {
+                "description": "SAP Business One Client accesses the port of Samba.",
+                "direction": "ingress",
+                "ethertype": "IPv4",
+                "protocol": "tcp",
+                "ports": "139,445,137,138",
+                "remote_address_group_id": "${huaweicloud_vpc_address_group.ipGroup-b1client.id}",
+                "security_group_id": "${huaweicloud_networking_secgroup.secgroup_b1_server.id}"
+            },
+            "b1client_to_hana": {
+                "description": "SAP Business One Client accesses the port of HANA.",
+                "direction": "ingress",
+                "ethertype": "IPv4",
+                "protocol": "tcp",
+                "ports": "30013,30015,30017,50013-50014,4300",
+                "remote_address_group_id": "${huaweicloud_vpc_address_group.ipGroup-b1client.id}",
+                "security_group_id": "${huaweicloud_networking_secgroup.secgroup_b1_server.id}"
+            },
+            "b1client_to_b1": {
+                "description": "SAP Business One Client accesses the port of SAP Business One.",
+                "direction": "ingress",
+                "ethertype": "IPv4",
+                "protocol": "tcp",
+                "ports": "40000,50000-50004",
+                "remote_address_group_id": "${huaweicloud_vpc_address_group.ipGroup-b1client.id}",
+                "security_group_id": "${huaweicloud_networking_secgroup.secgroup_b1_server.id}"
+            },
+            "dnat_to_b1_50000": {
+                "description": "External access to the Service Layer of SAP Business One through the DNAT.",
+                "direction": "ingress",
+                "ethertype": "IPv4",
+                "protocol": "tcp",
+                "ports": "50000",
+                "remote_ip_prefix": "0.0.0.0/0",
+                "security_group_id": "${huaweicloud_networking_secgroup.secgroup_b1_server.id}"
+            },
+            "cbr_to_b1": {
+                "description": "Bypass the access port of Cloud Backup and Recovery (CBR) for database backup.",
+                "direction": "ingress",
+                "ethertype": "IPv4",
+                "protocol": "tcp",
+                "ports": "59526-59528",
+                "remote_ip_prefix": "100.125.0.0/16",
+                "security_group_id": "${huaweicloud_networking_secgroup.secgroup_b1_server.id}"
+            }
+        },
+        "huaweicloud_compute_instance": {
+            "compute_instance_server": {
+                "depends_on": [
+                    "huaweicloud_nat_snat_rule.snat_b1_server"
+                ],
+                "availability_zone": "${var.availability_zone}",
+                "charging_mode": "${var.charging_mode}",
+                "period_unit": "${var.charging_unit}",
+                "period": "${var.charging_period}",
+                "flavor_id": "${var.ecs_server_flavor}",
+                "image_id": "${var.server_image_id}",
+                "name": "${var.ecs_server_name}",
+                "system_disk_type": "${var.server_system_disk_type}",
+                "system_disk_size": "${var.server_system_disk_size}",
+                "agent_list": "${var.is_hss == true ? \"hss,hss-ent\" : \"hss\"}",
+                "user_data": "#! /bin/bash\necho 'root:${var.ecs_server_password}' | chpasswd\nwget -P /tmp/ https://documentation-samples-4.obs.ap-southeast-3.myhuaweicloud.com/solution-as-code-moudle/rapid-deployment-of-sap-b1-cloud-environment/userdata/initialize-sap-b1-environment.sh\nchmod 700 /tmp/initialize-sap-b1-environment.sh\n/tmp/initialize-sap-b1-environment.sh 'SFS_TURBO_NAME=${var.sfs_turbo_name}' 'SFS_TURBO_IP=${local.sfs_turbo_ip}' 'OBS_BUCKET_NAME=${var.obs_bucket_name}' 'AK=${var.ak}' 'SK=${var.sk}'  > /tmp/tmp.log 2>&1\nrm -rf /tmp/initialize-sap-b1-environment.sh",
+                "network": [
+                    {
+                        "fixed_ip_v4": "${var.ecs_server_businessIP}",
+                        "uuid": "${huaweicloud_vpc_subnet.subnet_b1_server.id}"
+                    }
+                ],
+                "security_group_ids": [
+                    "${huaweicloud_networking_secgroup.secgroup_b1_server.id}"
+                ]
+            },
+            "compute_instance_client": {
+                "availability_zone": "${var.availability_zone}",
+                "charging_mode": "${var.charging_mode}",
+                "period_unit": "${var.charging_unit}",
+                "period": "${var.charging_period}",
+                "flavor_id": "${var.ecs_client_flavor}",
+                "image_id": "${var.client_image_id}",
+                "name": "${var.ecs_client_name}",
+                "system_disk_type": "${var.client_system_disk_type}",
+                "system_disk_size": "${var.client_system_disk_size}",
+                "admin_pass": "${var.ecs_client_password}",
+                "network": [
+                    {
+                        "fixed_ip_v4": "${var.ecs_client_businessIP}",
+                        "uuid": "${huaweicloud_vpc_subnet.subnet_b1_client.id}"
+                    }
+                ],
+                "security_group_ids": [
+                    "${huaweicloud_networking_secgroup.secgroup_b1_client.id}"
+                ]
+            }
+        },
+        "huaweicloud_evs_volume": {
+            "evs_hana_swap": {
+                "charging_mode": "${var.charging_mode}",
+                "period_unit": "${var.charging_unit}",
+                "period": "${var.charging_period}",
+                "name": "${var.ecs_server_name}-swap",
+                "availability_zone": "${var.availability_zone}",
+                "volume_type": "${var.evs_hana_swap_type}",
+                "size": "${var.evs_hana_swap_size}"
+            },
+            "evs_hana_sap": {
+                "charging_mode": "${var.charging_mode}",
+                "period_unit": "${var.charging_unit}",
+                "period": "${var.charging_period}",
+                "name": "${var.ecs_server_name}-sap",
+                "availability_zone": "${var.availability_zone}",
+                "volume_type": "${var.evs_hana_sap_type}",
+                "size": "${var.evs_hana_sap_size}"
+            },
+            "evs_hana_log": {
+                "charging_mode": "${var.charging_mode}",
+                "period_unit": "${var.charging_unit}",
+                "period": "${var.charging_period}",
+                "name": "${var.ecs_server_name}-log",
+                "availability_zone": "${var.availability_zone}",
+                "volume_type": "${var.evs_hana_log_type}",
+                "size": "${var.evs_hana_log_size}"
+            },
+            "evs_hana_shared": {
+                "charging_mode": "${var.charging_mode}",
+                "period_unit": "${var.charging_unit}",
+                "period": "${var.charging_period}",
+                "name": "${var.ecs_server_name}-shared",
+                "availability_zone": "${var.availability_zone}",
+                "volume_type": "${var.evs_hana_shared_type}",
+                "size": "${var.evs_hana_shared_size}"
+            },
+            "evs_hana_data1": {
+                "charging_mode": "${var.charging_mode}",
+                "period_unit": "${var.charging_unit}",
+                "period": "${var.charging_period}",
+                "name": "${var.ecs_server_name}-data1",
+                "availability_zone": "${var.availability_zone}",
+                "volume_type": "${var.evs_hana_data_type}",
+                "size": "${tonumber(var.evs_hana_data_size)/2}"
+            },
+            "evs_hana_data2": {
+                "charging_mode": "${var.charging_mode}",
+                "period_unit": "${var.charging_unit}",
+                "period": "${var.charging_period}",
+                "name": "${var.ecs_server_name}-data2",
+                "availability_zone": "${var.availability_zone}",
+                "volume_type": "${var.evs_hana_data_type}",
+                "size": "${tonumber(var.evs_hana_data_size)/2}"
+            },
+            "evs_client_data": {
+                "charging_mode": "${var.charging_mode}",
+                "period_unit": "${var.charging_unit}",
+                "period": "${var.charging_period}",
+                "name": "${var.ecs_client_name}-data",
+                "availability_zone": "${var.availability_zone}",
+                "volume_type": "${var.client_data_disk_type}",
+                "size": "${var.client_data_disk_size}"
+            }
+        },
+        "huaweicloud_compute_volume_attach": {
+            "evs_hana_swap_attach": {
+                "instance_id": "${huaweicloud_compute_instance.compute_instance_server.id}",
+                "volume_id": "${huaweicloud_evs_volume.evs_hana_swap.id}",
+                "device": "/dev/vdb"
+            },
+            "evs_hana_sap_attach": {
+                "depends_on": [
+                    "huaweicloud_compute_volume_attach.evs_hana_swap_attach"
+                ],
+                "instance_id": "${huaweicloud_compute_instance.compute_instance_server.id}",
+                "volume_id": "${huaweicloud_evs_volume.evs_hana_sap.id}",
+                "device": "/dev/vdc"
+            },
+            "evs_hana_log_attach": {
+                "depends_on": [
+                    "huaweicloud_compute_volume_attach.evs_hana_sap_attach"
+                ],
+                "instance_id": "${huaweicloud_compute_instance.compute_instance_server.id}",
+                "volume_id": "${huaweicloud_evs_volume.evs_hana_log.id}",
+                "device": "/dev/vdd"
+            },
+            "evs_hana_shared_attach": {
+                "depends_on": [
+                    "huaweicloud_compute_volume_attach.evs_hana_log_attach"
+                ],
+                "instance_id": "${huaweicloud_compute_instance.compute_instance_server.id}",
+                "volume_id": "${huaweicloud_evs_volume.evs_hana_shared.id}",
+                "device": "/dev/vde"
+            },
+            "evs_hana_data1_attach": {
+                "depends_on": [
+                    "huaweicloud_compute_volume_attach.evs_hana_shared_attach"
+                ],
+                "instance_id": "${huaweicloud_compute_instance.compute_instance_server.id}",
+                "volume_id": "${huaweicloud_evs_volume.evs_hana_data1.id}",
+                "device": "/dev/vdf"
+            },
+            "evs_hana_data2_attach": {
+                "depends_on": [
+                    "huaweicloud_compute_volume_attach.evs_hana_shared_attach"
+                ],
+                "instance_id": "${huaweicloud_compute_instance.compute_instance_server.id}",
+                "volume_id": "${huaweicloud_evs_volume.evs_hana_data2.id}",
+                "device": "/dev/vdg"
+            },
+            "evs_client_data_attach": {
+                "instance_id": "${huaweicloud_compute_instance.compute_instance_client.id}",
+                "volume_id": "${huaweicloud_evs_volume.evs_client_data.id}"
+            }
+        },
+        "huaweicloud_cbr_policy": {
+            "cbr_policy": {
+                "backup_cycle": [
+                    {
+                        "execution_times": [
+                            "19:00"
+                        ],
+                        "interval": 3
+                    }
+                ],
+                "name": "${var.ecs_server_name}-policy",
+                "time_period": 7,
+                "type": "backup"
+            }
+        },
+        "huaweicloud_cbr_vault": {
+            "cbr_vault": {
+                "auto_expand": true,
+                "consistent_level": "app_consistent",
+                "resources": [
+                    {
+                        "server_id": "${huaweicloud_compute_instance.compute_instance_server.id}"
+                    }
+                ],
+                "name": "${var.ecs_server_name}-vault",
+                "protection_type": "backup",
+                "size": 100,
+                "type": "server",
+                "policy_id": "${huaweicloud_cbr_policy.cbr_policy.id}"
+            }
+        },
+        "huaweicloud_sfs_turbo": {
+            "sfs_turbo_b1_backup": {
+                "count": "${var.sfs_turbo_name == \"\" ? 0 : 1}",
+                "name": "${var.sfs_turbo_name}",
+                "security_group_id": "${huaweicloud_networking_secgroup.secgroup_b1_server.id}",
+                "share_proto": "NFS",
+                "size": 500,
+                "subnet_id": "${huaweicloud_vpc_subnet.subnet_sfs_turbo.0.id}",
+                "vpc_id": "${huaweicloud_vpc.vpc.id}",
+                "availability_zone": "${var.availability_zone}"
+            }
+        },
+        "huaweicloud_obs_bucket": {
+            "hana_backup_bucket": {
+                "count": "${var.obs_bucket_name == \"\" ? 0 : 1}",
+                "acl": "private",
+                "bucket": "${lower(var.obs_bucket_name)}",
+                "multi_az": true,
+                "parallel_fs": true
+            }
+        },
+        "huaweicloud_vpc_eip": {
+            "eip": {
+                "name": "${var.vpc_name}-nat-eip",
+                "bandwidth": {
+                    "name": "${var.vpc_name}-nat-bandwidth",
+                    "share_type": "PER",
+                    "size": "${var.eip_bandwidth_size}",
+                    "charge_mode": "bandwidth"
+                },
+                "publicip": {
+                    "type": "5_bgp"
+                },
+                "charging_mode": "${var.charging_mode}",
+                "period_unit": "${var.charging_unit}",
+                "period": "${var.charging_period}"
+            }
+        },
+        "huaweicloud_nat_gateway": {
+            "nat_gateway": {
+                "name": "${var.vpc_name}-nat-gateway",
+                "description": "SAP B1 NAT gateway",
+                "spec": "1",
+                "vpc_id": "${huaweicloud_vpc.vpc.id}",
+                "subnet_id": "${huaweicloud_vpc_subnet.subnet_b1_server.id}"
+            }
+        },
+        "huaweicloud_nat_dnat_rule": {
+            "dnat_server22": {
+                "nat_gateway_id": "${huaweicloud_nat_gateway.nat_gateway.id}",
+                "floating_ip_id": "${huaweicloud_vpc_eip.eip.id}",
+                "port_id": "${huaweicloud_compute_instance.compute_instance_server.network[0].port}",
+                "protocol": "tcp",
+                "internal_service_port": 22,
+                "external_service_port": 60022
+            },
+            "dnat_server50000": {
+                "nat_gateway_id": "${huaweicloud_nat_gateway.nat_gateway.id}",
+                "floating_ip_id": "${huaweicloud_vpc_eip.eip.id}",
+                "port_id": "${huaweicloud_compute_instance.compute_instance_server.network[0].port}",
+                "protocol": "tcp",
+                "internal_service_port": 50000,
+                "external_service_port": 50001
+            },
+            "dnat_server3389": {
+                "nat_gateway_id": "${huaweicloud_nat_gateway.nat_gateway.id}",
+                "floating_ip_id": "${huaweicloud_vpc_eip.eip.id}",
+                "port_id": "${huaweicloud_compute_instance.compute_instance_client.network[0].port}",
+                "protocol": "tcp",
+                "internal_service_port": 3389,
+                "external_service_port": 63389
+            }
+        },
+        "huaweicloud_nat_snat_rule": {
+            "snat_b1_server": {
+                "nat_gateway_id": "${huaweicloud_nat_gateway.nat_gateway.id}",
+                "floating_ip_id": "${huaweicloud_vpc_eip.eip.id}",
+                "source_type": 0,
+                "subnet_id": "${huaweicloud_vpc_subnet.subnet_b1_server.id}"
+            },
+            "snat_b1_client": {
+                "nat_gateway_id": "${huaweicloud_nat_gateway.nat_gateway.id}",
+                "floating_ip_id": "${huaweicloud_vpc_eip.eip.id}",
+                "source_type": 0,
+                "subnet_id": "${huaweicloud_vpc_subnet.subnet_b1_client.id}"
+            }
+        }
+    }
+}
